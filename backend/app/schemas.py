@@ -28,6 +28,14 @@ class EntryPayload(BaseModel):
     remark: str | None = None
 
 
+class SettlementBatchRequest(BaseModel):
+    """跨日批量结算入参：多选来源登记 + 日期范围（闭区间，UTC+8 切日）。"""
+
+    entry_ids: list[int] = Field(default_factory=list, description="选中的来源登记 id 列表")
+    start_date: str = Field(..., description="开始日期 YYYY-MM-DD")
+    end_date: str = Field(..., description="结束日期 YYYY-MM-DD")
+
+
 
 class RegistryEntry(BaseModel):
     """服务实例明细结构。"""

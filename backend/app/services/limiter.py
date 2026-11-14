@@ -8,7 +8,14 @@ from app.store import store
 MODULE = "limiter"
 REQUIRED_FIELDS = ["规则编号", "限流对象", "限流算法"]
 STATUS_ORDER = ["草稿", "生效中", "已触发", "已关闭"]
-ACTION_RULES = {"启用限流": "草稿", "触发降级": "生效中", "关闭限流": "已触发"}
+# 动作 -> 目标状态：启用限流把草稿推进到生效中，触发/关闭依次推进。
+ACTION_RULES = {"启用限流": "生效中", "触发降级": "已触发", "关闭限流": "已关闭"}
+# 动作前置状态：不满足时拒绝，避免在生效中的规则上重复启用这类非法流转。
+ACTION_PRECONDITIONS = {
+    "启用限流": "草稿",
+    "触发降级": "生效中",
+    "关闭限流": "已触发",
+}
 NEGATIVE_ACTIONS = []
 
 
@@ -53,9 +60,14 @@ class LimiterService:
         if action not in ACTION_RULES:
             return None, f"动作「{action}」不属于调用限流降级可执行范围"
         target = ACTION_RULES[action]
+        precondition = ACTION_PRECONDITIONS[action]
+        current = str(entry.get("status") or "")
+        if current != precondition:
+            return None, f"限流规则当前为「{current}」，仅「{precondition}」状态可执行{action}"
         if target not in STATUS_ORDER:
             return None, f"目标状态「{target}」不在允许的状态序列里"
         entry["status"] = target
+        entry["规则状态"] = target
         entry["pending"] = target != STATUS_ORDER[-1]
         entry["abnormal"] = action in NEGATIVE_ACTIONS
         return entry, f"限流规则已{action}"
